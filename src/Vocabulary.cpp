@@ -139,6 +139,9 @@ void Vocabulary::create(
         for(int r=0;r<training_features[i].rows;r++)
             vtf[i][r]=training_features[i].rowRange(r,r+1);
     }
+//    {
+//        std::vector< cv::Mat > ().swap(training_features);
+//    }
     create(vtf);
 
 }
@@ -158,7 +161,6 @@ void Vocabulary::create(
 
   std::vector<cv::Mat> features;
   getFeatures(training_features, features);
-
 
   // create root
   m_nodes.push_back(Node(0)); // root
@@ -222,7 +224,7 @@ void Vocabulary::getFeatures(
 void Vocabulary::HKmeansStep(NodeId parent_id,
                              const std::vector<cv::Mat> &descriptors, int current_level)
 {
-
+    std::cerr << "Current level: "<< current_level << " with node: " << parent_id << std::endl;
     if(descriptors.empty()) return;
 
     // features associated to each cluster
@@ -242,7 +244,9 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
         for(unsigned int i = 0; i < descriptors.size(); i++)
         {
             groups[i].push_back(i);
-            clusters.push_back(descriptors[i]);
+            //clusters.push_back(descriptors[i]);
+            //add by xushen
+            clusters.push_back(descriptors[i].clone());
         }
     }
     else
@@ -255,6 +259,7 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
         // to check if clusters move after iterations
         std::vector<int> last_association, current_association;
 
+        int iterations = 0;
         while(goon)
         {
             // 1. Calculate clusters
@@ -275,7 +280,10 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
                     std::vector<unsigned int>::const_iterator vit;
                     for(vit = groups[c].begin(); vit != groups[c].end(); ++vit)
                     {
-                        cluster_descriptors.push_back(descriptors[*vit]);
+                        //add by xushen
+                        cluster_descriptors.push_back(descriptors[*vit].clone());
+
+                        //cluster_descriptors.push_back(descriptors[*vit]);
                     }
 
                     DescManip::meanValue(cluster_descriptors, clusters[c]);
@@ -286,13 +294,23 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
             // 2. Associate features with clusters
 
             // calculate distances to cluster centers
+
+            // add by xushen
+//            std::vector<std::vector<unsigned int> > ().swap(groups);
+
             groups.clear();
             groups.resize(clusters.size(), std::vector<unsigned int>());
+
+            // add by xushen
+//            std::vector<int> ().swap(current_association);
+//            current_association.clear();
+
             current_association.resize(descriptors.size());
 
             //assoc.clear();
 
             //unsigned int d = 0;
+            double total_d = 0;
             for(auto  fit = descriptors.begin(); fit != descriptors.end(); ++fit)//, ++d)
             {
                 double best_dist = DescManip::distance((*fit), clusters[0]);
@@ -306,6 +324,7 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
                         best_dist = dist;
                         icluster = c;
                     }
+                    total_d += dist;
                 }
 
                 //assoc.ref<unsigned char>(icluster, d) = 1;
@@ -313,7 +332,7 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
                 groups[icluster].push_back(fit - descriptors.begin());
                 current_association[ fit - descriptors.begin() ] = icluster;
             }
-
+            std::cout << "iteration " << iterations++ << ", with total distanse " << total_d << std::endl;
             // kmeans++ ensures all the clusters has any feature associated with them
 
             // 3. check convergence
@@ -351,7 +370,9 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
     {
         NodeId id = m_nodes.size();
         m_nodes.push_back(Node(id));
-        m_nodes.back().descriptor = clusters[i];
+        //m_nodes.back().descriptor = clusters[i];
+        //add by xushen
+        m_nodes.back().descriptor = clusters[i].clone();
         m_nodes.back().parent = parent_id;
         m_nodes[parent_id].children.push_back(id);
     }
@@ -389,7 +410,9 @@ void Vocabulary::initiateClusters
   (const std::vector<cv::Mat> &descriptors,
    std::vector<cv::Mat> &clusters) const
 {
+    //static int c = 0;
   initiateClustersKMpp(descriptors, clusters);
+  //std::cout<<descriptors[0] << " "<< c++ << std::endl;
 }
 
 // --------------------------------------------------------------------------
@@ -422,7 +445,9 @@ void Vocabulary::initiateClustersKMpp(
   int ifeature = rand()% pfeatures.size();//DUtils::Random::RandomInt(0, pfeatures.size()-1);
 
   // create first cluster
-  clusters.push_back(pfeatures[ifeature]);
+  //clusters.push_back(pfeatures[ifeature]);
+  //add by xushen
+  clusters.push_back(pfeatures[ifeature].clone());
 
   // compute the initial distances
    std::vector<double>::iterator dit;
@@ -470,7 +495,9 @@ void Vocabulary::initiateClustersKMpp(
         ifeature = dit - min_dists.begin();
 
 
-      clusters.push_back(pfeatures[ifeature]);
+      //clusters.push_back(pfeatures[ifeature]);
+      //add by xushen
+      clusters.push_back(pfeatures[ifeature].clone());
     } // if dist_sum > 0
     else
       break;
@@ -901,6 +928,30 @@ void Vocabulary::transform(const cv::Mat &feature,
         // std::cout<<bestidx<<" "<<final_id<<" d:"<<best_d<<" "<<m_nodes[final_id].descriptor<<  std::endl<<std::endl;
       } while( !m_nodes[final_id].isLeaf() );
    }
+
+  // Add by Xushen
+  else{
+      do
+      {
+          auto const  &nodes = m_nodes[final_id].children;
+          double best_d = std::numeric_limits<uint64_t>::max();
+          int idx=0,bestidx=0;
+           for(const auto  &id:nodes)
+          {
+              //compute distance
+             //  std::cout<<idx<< " "<<id<<" "<< m_nodes[id].descriptor<<std::endl;
+              double dist= DescManip::distance(feature, m_nodes[id].descriptor);
+              if(dist < best_d)
+              {
+                  best_d = dist;
+                  final_id = id;
+                  bestidx=idx;
+              }
+              idx++;
+          }
+        // std::cout<<bestidx<<" "<<final_id<<" d:"<<best_d<<" "<<m_nodes[final_id].descriptor<<  std::endl<<std::endl;
+      } while( !m_nodes[final_id].isLeaf() );
+  }
 
 //      uint64_t ret=0;
 //      const uchar *pb = b.ptr<uchar>();

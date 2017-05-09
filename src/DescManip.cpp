@@ -161,16 +161,38 @@ std::string DescManip::toString(const cv::Mat &a)
 
 // --------------------------------------------------------------------------
   
+//void DescManip::fromString(cv::Mat &a, const std::string &s)
+//{
+
+//    //check if the dbow3 is present
+//    string ss_aux;ss_aux.reserve(10);
+//    for(size_t i=0;i<10 && i<s.size();i++)
+//        ss_aux.push_back(s[i]);
+//    if(ss_aux.find("dbw3")==std::string::npos){//is dbow2
+//        //READ UNTIL END
+//        stringstream ss(s);
+//        int val;
+//        vector<uchar> data;data.reserve(100);
+//        while( ss>>val) data.push_back(val);
+//        //copy to a
+//        a.create(1,data.size(),CV_8UC1);
+//        memcpy(a.ptr<char>(0),&data[0],data.size());
+//    }
+//    else{
+//        int type,cols;
+//        stringstream ss(s);
+//        ss >>type>>cols;
+//        a.create(1,  cols, type);
 void DescManip::fromString(cv::Mat &a, const std::string &s)
 {
 
     //check if the dbow3 is present
-    string ss_aux;ss_aux.reserve(10);
-    for(size_t i=0;i<10 && i<s.size();i++)
-        ss_aux.push_back(s[i]);
+    string ss_aux;
+    stringstream ss(s);
+    ss>>ss_aux;
     if(ss_aux.find("dbw3")==std::string::npos){//is dbow2
         //READ UNTIL END
-        stringstream ss(s);
+        //stringstream ss(s);
         int val;
         vector<uchar> data;data.reserve(100);
         while( ss>>val) data.push_back(val);
@@ -180,7 +202,7 @@ void DescManip::fromString(cv::Mat &a, const std::string &s)
     }
     else{
         int type,cols;
-        stringstream ss(s);
+        //stringstream ss(s);
         ss >>type>>cols;
         a.create(1,  cols, type);
         if(type==CV_8UC1){

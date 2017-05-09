@@ -83,7 +83,7 @@ vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string desc
 
 // ----------------------------------------------------------------------------
 
-void testVocCreation(const vector<cv::Mat> &features)
+void testVocCreation(vector<cv::Mat> &features)
 {
     // branching factor and depth levels
     const int k = 9;

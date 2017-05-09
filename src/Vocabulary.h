@@ -86,7 +86,7 @@ public:
    * @param training_features. Each row of a matrix is a feature
    */
    virtual void create
-    (const  std::vector<cv::Mat>   &training_features);
+    (const std::vector<cv::Mat>   &training_features);
 
   /**
    * Creates a vocabulary from the training features, setting the branching
