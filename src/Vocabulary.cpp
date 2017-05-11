@@ -224,7 +224,7 @@ void Vocabulary::getFeatures(
 void Vocabulary::HKmeansStep(NodeId parent_id,
                              const std::vector<cv::Mat> &descriptors, int current_level)
 {
-    std::cerr << "Current level: "<< current_level << " with node: " << parent_id << std::endl;
+    std::cout << "Current level: "<< current_level << " with node: " << parent_id << std::endl;
     if(descriptors.empty()) return;
 
     // features associated to each cluster
@@ -324,15 +324,16 @@ void Vocabulary::HKmeansStep(NodeId parent_id,
                         best_dist = dist;
                         icluster = c;
                     }
-                    total_d += dist;
                 }
-
+                // xushen debug
+                total_d += best_dist;
                 //assoc.ref<unsigned char>(icluster, d) = 1;
 
                 groups[icluster].push_back(fit - descriptors.begin());
                 current_association[ fit - descriptors.begin() ] = icluster;
             }
-            std::cout << "iteration " << iterations++ << ", with total distanse " << total_d << std::endl;
+            //xushen debug
+            std::cout << "iteration " << iterations++ << ", with total distanse " << std::fixed << total_d << " of " << descriptors.size() << " features" << std::endl;
             // kmeans++ ensures all the clusters has any feature associated with them
 
             // 3. check convergence

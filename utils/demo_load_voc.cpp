@@ -91,7 +91,7 @@ vector<string> readImagePaths(int argc,char **argv,int start){
         return paths;
 }
 
-vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string descriptor="") throw (std::exception){
+vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string descriptor="", bool loadifexist = true) throw (std::exception){
     //select detector
     cv::Ptr<cv::Feature2D> fdetector;
     if (descriptor=="orb")        fdetector=cv::ORB::create();
@@ -100,7 +100,7 @@ vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string desc
     else if (descriptor=="akaze") fdetector=cv::AKAZE::create();
 #endif
 #ifdef USE_CONTRIB
-    else if(descriptor=="surf" )  fdetector=cv::xfeatures2d::SURF::create(400, 4, 2, EXTENDED_SURF);
+    else if(descriptor=="surf" )  fdetector=cv::xfeatures2d::SURF::create(400, 4, 3, true);
     else if(descriptor=="sift") fdetector=cv::xfeatures2d::SIFT::create(500,8);
 #endif
 
@@ -111,7 +111,7 @@ vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string desc
 
     cout << "Extracting   features..." << endl;
     features.reserve(path_to_images.size());
-    if(readFeaturesFromFile("features.txt", features))
+    if(loadifexist && readFeaturesFromFile("features."+descriptor, features))
         return features;
 
     double p = 0;
@@ -127,21 +127,26 @@ vector< cv::Mat  >  loadFeatures( std::vector<string> path_to_images,string desc
         if(image.empty())throw std::runtime_error("Could not open image"+path_to_images[i]);
         //cout<<"extracting features"<<endl;
         fdetector->detectAndCompute(image, cv::Mat(), keypoints, descriptors);
+        if(!descriptors.isContinuous())
+        {
+            cerr << "warning: image " << path_to_images[i] << " is wrong." << endl;
+        }
+
         features.push_back(descriptors);
         //cout<<"done detecting features"<<endl;
-        if(i == int((int)path_to_images.size() * p))
+        if((int)i == int((int)path_to_images.size() * p))
         {
             cout << p * 100 << "% finished from " << path_to_images.size() << " images" << endl;
             p += 0.01;
         }
     }
-    saveToFile("features.txt", features);
+    saveToFile("features."+descriptor, features);
     return features;
 }
 
 // ----------------------------------------------------------------------------
 
-void testVocCreation(const vector<cv::Mat> &features, int k = 9, int L = 3)
+void testVocCreation(const vector<cv::Mat> &features, int k = 9, int L = 3, string name = "small_voc")
 {
     // branching factor and depth levels
     //const int k = 9;
@@ -155,38 +160,38 @@ void testVocCreation(const vector<cv::Mat> &features, int k = 9, int L = 3)
     voc.create(features);
     cout << "... done!" << endl;
 
+    // save the vocabulary to disk
+    cout << endl << "Saving vocabulary..." << endl;
+    voc.save(name+".yml.gz");
+    cout << "Done" << endl;
+
     cout << "Vocabulary information: " << endl
          << voc << endl << endl;
 
-    //lets do something with this vocabulary
-    cout << "Matching images against themselves (0 low, 1 high): " << endl;
-    BowVector v1, v2;
-    for(size_t i = 0; i < features.size(); i++)
-    {
-        voc.transform(features[i], v1);
-        for(size_t j = 0; j < features.size(); j++)
-        {
-            voc.transform(features[j], v2);
+//    //lets do something with this vocabulary
+//    cout << "Matching images against themselves (0 low, 1 high): " << endl;
+//    BowVector v1, v2;
+//    for(size_t i = 0; i < features.size(); i++)
+//    {
+//        voc.transform(features[i], v1);
+//        for(size_t j = 0; j < features.size(); j++)
+//        {
+//            voc.transform(features[j], v2);
 
-            double score = voc.score(v1, v2);
-            cout << "Image " << i << " vs Image " << j << ": " << score << endl;
-        }
-    }
-
-    // save the vocabulary to disk
-    cout << endl << "Saving vocabulary..." << endl;
-    voc.save("small_voc.yml.gz");
-    cout << "Done" << endl;
+//            double score = voc.score(v1, v2);
+//            cout << "Image " << i << " vs Image " << j << ": " << score << endl;
+//        }
+//    }
 }
 
 ////// ----------------------------------------------------------------------------
 
-void testDatabase(const  vector<cv::Mat > &features)
+void testDatabase(const  vector<cv::Mat > &features, string name = "small_voc")
 {
     cout << "Creating a small database..." << endl;
 
     // load the vocabulary from disk
-    Vocabulary voc("small_voc.yml.gz");
+    Vocabulary voc(name+".yml.gz");
 
     Database db(voc, false, 0); // false = do not use direct index
     // (so ignore the last param)
@@ -246,11 +251,11 @@ int main(int argc,char **argv)
         string descriptor=argv[1];
 
         auto images=readImagePaths(argc,argv,2);
-        vector< cv::Mat   >   features= loadFeatures(images,descriptor);
+        vector< cv::Mat   >   features= loadFeatures(images,descriptor, true);
 //        vector< cv::Mat   >   features2;
 //        for(auto i = features.begin(); i !=features.end(); i++)
 //            features2.push_back((*i).clone());
-        testVocCreation(features, 10, 5);
+        testVocCreation(features, 10, 6, descriptor);
 
 //        for(int i = 0; i < features.size(); i++)
 //        {
@@ -267,8 +272,8 @@ int main(int argc,char **argv)
 //                }
 //            }
 //        }
-
-        //testDatabase(features2);
+//        vector< cv::Mat   >   features2= loadFeatures(images,descriptor);
+//        testDatabase(features2);
 
     }catch(std::exception &ex){
         cerr<<ex.what()<<endl;
